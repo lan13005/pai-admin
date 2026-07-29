@@ -19,6 +19,14 @@ slurmtree [-a ACCOUNT] [-c CLUSTER] [-q] [-u]     # -q shows QOS, -u shows users
 slurmtree -a ailab -q -u
 ```
 
+## Faculty sponsor
+
+```bash
+finger <user>     # Office: <dept>, <faculty sponsor>
+```
+
+Use **Office** to map a netid to their faculty sponsor (and department).
+
 ## Two access gates
 
 Both partitions use `AllowGroups=cses,ailab`. **Unix group ≠ Slurm account** — a user needs both.

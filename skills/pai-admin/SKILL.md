@@ -1,6 +1,6 @@
 ---
 name: pai-admin
-description: Slurm administration for the Della HPC cluster (ailab, ailab-p, pli). Use when the user asks about GPU availability, node status, job queues, user access, adding users to ailab/ailab-p, coordinator account management, QOS limits, multifactor priority / sprio, partition info, account trees (slurmtree), ailab-p subaccounts, cluster diagnostics, job_submit.lua / Slurm config paths, or account/submit plugins.
+description: Slurm administration for the Della HPC cluster (ailab, ailab-p, pli). Use when the user asks about GPU availability, node status, job queues, user access, faculty sponsor / office lookup (finger), adding users to ailab/ailab-p, coordinator account management, QOS limits, multifactor priority / sprio, partition info, account trees (slurmtree), ailab-p subaccounts, cluster diagnostics, job_submit.lua / Slurm config paths, or account/submit plugins.
 ---
 
 # Della Admin Guide
@@ -39,10 +39,12 @@ qos                                    # QOS priorities and limits
 
 ### Check or grant a user's access
 
-1. Unix gate: `getent group ailab | grep <user>` and `id <user>` — **sysadmins** own this.
-2. Slurm gate: `sacctmgr show assoc where User=<user> format=Cluster,Account,User,Partition,QOS%200`
+1. Identity / sponsor: `finger <user>` — read **Office** (`<dept>, <faculty sponsor>`). Use this to
+   place the user under the right faculty-owned fileset or project account.
+2. Unix gate: `getent group ailab | grep <user>` and `id <user>` — **sysadmins** own this.
+3. Slurm gate: `sacctmgr show assoc where User=<user> format=Cluster,Account,User,Partition,QOS%200`
    and `slurmtree -a ailab -q -u` — **coordinators** own this.
-3. Both gates must pass. Full rules, subaccount layout, and allocation caps:
+4. Both gates must pass. Full rules, subaccount layout, and allocation caps:
    [references/accounts.md](references/accounts.md).
 
 ### Investigate a rejected submission
@@ -63,7 +65,7 @@ guidance, storage, and support contacts: [references/pli-partition.md](reference
 
 | File | Contents |
 |------|----------|
-| [references/accounts.md](references/accounts.md) | `ailab` / `ailab-p` account tree, the two access gates, partition account rules, `GrpTRESMins` allocations |
+| [references/accounts.md](references/accounts.md) | `ailab` / `ailab-p` account tree, faculty sponsor via `finger`, the two access gates, partition account rules, `GrpTRESMins` allocations |
 | [references/priority.md](references/priority.md) | Multifactor priority formula, where each factor comes from, submit-time QOS routing (`gpu-*` vs `pli-*`) |
 | [references/submit-restrictions.md](references/submit-restrictions.md) | Submit-time rules from `job_submit.lua`, RPC → plugin chain, inspecting compiled `.so` plugins |
 | [references/pli-partition.md](references/pli-partition.md) | User-facing PLI model: audience, intent, best practices, storage, support |
@@ -87,6 +89,7 @@ scontrol show config | rg -i 'PriorityWeight|PriorityType|PriorityFlags|Priority
 ## Useful commands
 
 ```bash
+finger <user>                          # Office = dept, faculty sponsor
 scontrol show job <jobid>
 scontrol show node <nodename>
 sacct -j <jobid> --format=JobID,JobName,Partition,State,Elapsed,MaxRSS,MaxVMSize,AllocTRES%40
