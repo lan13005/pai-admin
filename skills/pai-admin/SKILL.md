@@ -39,8 +39,7 @@ qos                                    # QOS priorities and limits
 
 ### Check or grant a user's access
 
-1. Identity / sponsor: `finger <user>` — read **Office** (`<dept>, <faculty sponsor>`). Use this to
-   place the user under the right faculty-owned fileset or project account.
+1. Identity / sponsor: `finger <user>` — read **Office** (`<dept>, <faculty sponsor>`).
 2. Unix gate: `getent group ailab | grep <user>` and `id <user>` — **sysadmins** own this.
 3. Slurm gate: `sacctmgr show assoc where User=<user> format=Cluster,Account,User,Partition,QOS%200`
    and `slurmtree -a ailab -q -u` — **coordinators** own this.

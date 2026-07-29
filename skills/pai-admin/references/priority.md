@@ -45,8 +45,29 @@ qos_factor = qos_priority / max_qos_priority_cluster
 QOS_points = PriorityWeightQOS × qos_factor
 ```
 
+**Rule of thumb:** when `PriorityWeightQOS=8000` and max cluster QOS priority is `20000`,
+`QOS_points ≈ qos_priority × 0.4` (e.g. `gpu-short` 5000 → 2000 pts). Re-derive if either
+number drifts.
+
+### Scale factors (snapshot — re-check)
+
 ```bash
-scontrol show config | rg -i 'PriorityWeight|PriorityType|PriorityFlags|PriorityMax'
+scontrol show config | grep Priority
+```
+
+| Parameter | Recorded value |
+|-----------|----------------|
+| `PriorityWeightFairShare` | 12000 |
+| `PriorityWeightAge` | 10000 |
+| `PriorityWeightJobSize` | 10000 |
+| `PriorityWeightQOS` | 8000 |
+| `PriorityWeightPartition` | 1 |
+| `PriorityWeightAssoc` | 0 |
+| `PriorityFlags` | `MAX_TRES,NO_NORMAL_PART` |
+| `PriorityMaxAge` | 30 days |
+| `PriorityDecayHalfLife` | 15 days |
+
+```bash
 sacctmgr -n -P show qos format=Name,Priority,MaxTRESPerUser,GrpTRES
 sacctmgr -n -P show qos format=Name,Priority | awk -F'|' '{print $2, $1}' | sort -rn | head -5
 ```
