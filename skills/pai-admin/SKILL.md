@@ -1,0 +1,99 @@
+---
+name: pai-admin
+description: Slurm administration for the Della HPC cluster (ailab, ailab-p, pli). Use when the user asks about GPU availability, node status, job queues, user access, adding users to ailab/ailab-p, coordinator account management, QOS limits, multifactor priority / sprio, partition info, account trees (slurmtree), ailab-p subaccounts, cluster diagnostics, job_submit.lua / Slurm config paths, or account/submit plugins.
+---
+
+# Della Admin Guide
+
+Cluster: **Della** (Princeton Research Computing), scheduler **Slurm**.
+Restricted GPU partitions: **`ailab`** / **`ailab-p`** (H200), **`pli*`** (H100).
+
+**Prefer live reads over recorded values.** Every table in `references/` is a snapshot; re-verify
+with the commands below whenever policy may have changed.
+
+## Quick start
+
+```bash
+gfree                                  # free GPUs by type/partition
+shownodes -p ailab                     # node states
+squeue -p ailab                        # queue + pending reasons
+scontrol show partition ailab          # AllowGroups, MaxTime, TRESBillingWeights
+slurmtree -a ailab -q -u               # account tree with QOS (-q) and users (-u)
+qos                                    # QOS priorities and limits
+```
+
+## Workflows
+
+### Diagnose a pending job
+
+1. `scontrol show job <jobid>` — read `Reason`, `Partition`, `QOS`, `Account`. The QOS was assigned
+   from walltime at submit time, so it is usually **not** the partition default.
+2. `qos` — compare that QOS against the other tiers' priorities and per-user GPU ceilings. This one
+   command explains most `Priority` and `QOSMaxGRESPerUser` holds.
+3. Match the reason: `Priority` / `Resources` / `QOSMaxGRESPerUser` / `Dependency` — see
+   [references/troubleshooting.md](references/troubleshooting.md). For `Priority`, break the score
+   down with `sprio -j <jobid>` and `sshare -u <user>`; the formula, the walltime → `gpu-*` bins,
+   and the `pli-*` early return are in [references/priority.md](references/priority.md).
+4. Remember priority sets **queue order, not packing** — a wide multi-node GPU job can still
+   wait on fragmentation. Check `gfree` and `shownodes -p <partition>`.
+
+### Check or grant a user's access
+
+1. Unix gate: `getent group ailab | grep <user>` and `id <user>` — **sysadmins** own this.
+2. Slurm gate: `sacctmgr show assoc where User=<user> format=Cluster,Account,User,Partition,QOS%200`
+   and `slurmtree -a ailab -q -u` — **coordinators** own this.
+3. Both gates must pass. Full rules, subaccount layout, and allocation caps:
+   [references/accounts.md](references/accounts.md).
+
+### Investigate a rejected submission
+
+1. Read the exact `sbatch: error:` text. Rejections come from the **controller**, not the local
+   `sbatch` binary.
+2. Check the plugin chain: `scontrol show config | egrep -i 'JobSubmitPlugins|PluginDir'`
+   (typically `list_accounts,lua` with `PluginDir = /usr/lib64/slurm`).
+3. Map the message to a rule in [references/submit-restrictions.md](references/submit-restrictions.md),
+   then confirm against `/etc/slurm/job_submit.lua`.
+
+### Answer a PLI user question
+
+Which partition to use, why an empty queue still waits, CPU/mem per GPU, single-GPU and array-job
+guidance, storage, and support contacts: [references/pli-partition.md](references/pli-partition.md).
+
+## Reference material
+
+| File | Contents |
+|------|----------|
+| [references/accounts.md](references/accounts.md) | `ailab` / `ailab-p` account tree, the two access gates, partition account rules, `GrpTRESMins` allocations |
+| [references/priority.md](references/priority.md) | Multifactor priority formula, where each factor comes from, submit-time QOS routing (`gpu-*` vs `pli-*`) |
+| [references/submit-restrictions.md](references/submit-restrictions.md) | Submit-time rules from `job_submit.lua`, RPC → plugin chain, inspecting compiled `.so` plugins |
+| [references/pli-partition.md](references/pli-partition.md) | User-facing PLI model: audience, intent, best practices, storage, support |
+| [references/values.md](references/values.md) | Recorded inventory and QOS snapshots for quick citation |
+| [references/troubleshooting.md](references/troubleshooting.md) | Common pending reasons, node drain/down, who-is-using-what |
+
+## Slurm configuration paths
+
+Operator-facing files live under **`/etc/slurm/`**: `slurm.conf` (partitions, nodes,
+`AccountingStorage*`, `JobSubmitPlugins`, priority weights), `slurmdbd.conf` (accounting DB
+bridge, usually on the DB host), `gres.conf` (GPU definitions), `cgroup.conf`, `topology.conf`,
+`plugstack.conf` (SPANK stack), and `job_submit.lua` (Lua submit filter).
+
+Read the effective config rather than the files when possible:
+
+```bash
+scontrol show config | head -30
+scontrol show config | rg -i 'PriorityWeight|PriorityType|PriorityFlags|PriorityMax'
+```
+
+## Useful commands
+
+```bash
+scontrol show job <jobid>
+scontrol show node <nodename>
+sacct -j <jobid> --format=JobID,JobName,Partition,State,Elapsed,MaxRSS,MaxVMSize,AllocTRES%40
+seff <jobid>
+squeue -u <user>
+sshare -u <user>
+sprio -j <jobid>                       # weighted points;  -n for normalized factors
+sacctmgr show qos format=Name,Priority,GrpTRES,MaxTRESPU,MaxTRESPA,MaxJobsPU
+scancel <jobid>
+```

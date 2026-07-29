@@ -2,7 +2,7 @@
 
 Condensed from the PLI Della guide ([Notion](https://zinc-scale-b3f.notion.site/The-Della-cluster-and-the-PLI-partition-a3526cf557334124903964a3fa529f68)) by Yihe Dong. Use this when answering **who uses which PLI partition**, **shared-GPU misconceptions**, **storage**, or **user best practices**.
 
-**Do not treat QOS numbers here as live truth.** Re-verify with `sacctmgr show qos`, `scontrol show partition`, and `job_submit.lua`. Hard submit rules: **`01-job-submit-restrictions.md`**. Ops tables: **`SKILL.md` → Reference values**.
+**Do not treat QOS numbers here as live truth.** Re-verify with `sacctmgr show qos`, `scontrol show partition`, and `job_submit.lua`. Hard submit rules: [submit-restrictions.md](submit-restrictions.md). Recorded ops tables: [values.md](values.md).
 
 ---
 
@@ -30,6 +30,11 @@ In most cases users submit to **`pli`**, **`pli-lc`**, or **`pli-c`** (partition
 | Rare, selected high-priority projects | `pli-p` |
 
 Users may still use non-PLI Della GPUs. For quick tests, prefer Della **`gputest`** / short general-GPU jobs (&lt; 1 h). PLI has **no test partition**; wait times are expected. PLI is primarily for `sbatch`, not interactive testing.
+
+> Users must **not** pass `-p gputest` — the Lua filter rejects it. Instead, a GPU job with
+> `--time` ≤ 1 h is assigned `gpu-test` and moved into the `gputest` partition automatically. Tell
+> users to request an hour, not to name the partition. See
+> [submit-restrictions.md](submit-restrictions.md).
 
 **Age priority:** only the **10 oldest actively waiting jobs per user** accrue age-based priority.
 
@@ -79,7 +84,7 @@ A partition is better thought of as a **queue with rules**, not a dedicated set 
 
 1. Prefer **regular Della GPU** partitions for single-GPU work when possible.
 2. Large batches of single-GPU work on PLI → use **array jobs**.
-3. Cap concurrent array tasks (guide example: **32**) and keep **`della-j*`** free for multi-GPU (Lua also applies single-GPU excludes — see **`01-job-submit-restrictions.md`**).
+3. Cap concurrent array tasks (guide example: **32**) and keep **`della-j*`** free for multi-GPU (Lua also applies single-GPU excludes — see [submit-restrictions.md](submit-restrictions.md)).
 
 ---
 

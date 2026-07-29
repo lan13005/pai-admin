@@ -1,8 +1,10 @@
-## Slurm submission restrictions (Della / PLI / AiLab)
+# Slurm submission restrictions (Della / PLI / AiLab)
 
 This document summarizes **submission-time** restrictions enforced on the Della Slurm cluster, with emphasis on **PLI** and **AiLab** GPU partitions.
 
-### Where the restrictions live (and how they’re enabled)
+Recorded QOS and walltime tables: [values.md](values.md). Priority routing: [priority.md](priority.md).
+
+## Where the restrictions live (and how they’re enabled)
 
 - **Lua plugin file**: `/etc/slurm/job_submit.lua`
 - **Slurm mechanism**: `JobSubmitPlugins=... ,lua` (a Slurmctld-side job submit plugin)
@@ -16,7 +18,7 @@ Example expected output includes:
 - `JobSubmitPlugins = list_accounts,lua`
 - `PluginDir = /usr/lib64/slurm`
 
-### How the pieces connect (RPC → plugins → files)
+## How the pieces connect (RPC → plugins → files)
 
 1. **`sbatch`** sends a **submit RPC** to **`slurmctld`**. Submit-time policy runs **on the controller**, not inside the `sbatch` binary.
 
@@ -30,7 +32,7 @@ Example expected output includes:
 
 All of this happens **before** the job is scheduled or allocated; failures return over the same RPC `sbatch` already opened.
 
-### Inspecting compiled plugins (`.so`)
+## Inspecting compiled plugins (`.so`)
 
 ```bash
 strings /usr/lib64/slurm/job_submit_list_accounts.so | rg -i 'account|ERROR'
@@ -39,7 +41,7 @@ rg -a 'You have to specify an account' /usr/lib64/slurm/*.so
 
 `rg` may report `binary file matches` without printing lines; use `strings` piped to `rg`, or narrow to one `.so`.
 
-### Summary table (high-signal)
+## Summary table (high-signal)
 
 | Scope | What it checks | What happens | Notes / user-visible behavior |
 |---|---|---|---|
@@ -90,12 +92,35 @@ Jobs requesting “unlimited” memory are rejected:
 
 ### GPU job QoS naming convention (general GPU flow)
 
-For jobs detected as GPU jobs, the plugin constructs GPU QoS names:
-- takes a base QoS from walltime (`test|short|medium|long|vlong`)
-- maps `vlong -> long` for GPU jobs
-- sets `job_desc.qos = "gpu-" .. <base>`
+For jobs detected as GPU jobs (`is_GPU_job()`), the plugin builds the QoS name in three steps:
 
-This is why you often see QoS like `gpu-short`, `gpu-medium`, etc.
+1. `getQOS(job_desc.time_limit)` returns a base tier from walltime.
+2. `vlong` is remapped to `long` — GPU jobs only, so there is no `gpu-vlong`.
+3. `job_desc.qos = "gpu-" .. <base>`.
+
+Time bins, from the constants at the top of the Lua file:
+
+| Constant | Value (min) | `--time` | Base tier | GPU QoS |
+|----------|-------------|----------|-----------|---------|
+| `TEST_MINS` | 60 | ≤ 1 h | `test` | `gpu-test` |
+| `SHORT_MINS` | 1441 | ≤ 24 h | `short` | `gpu-short` |
+| `MEDIUM_MINS` | 4321 | ≤ 72 h | `medium` | `gpu-medium` |
+| `VLONG_MINS` | 8641 | ≤ 6 days | `vlong` → `long` | `gpu-long` |
+
+Anything above `VLONG_MINS` is rejected earlier with `ESLURM_INVALID_TIME_LIMIT`. `LONG_MINS`
+(2880) is commented out in the source, so no job is assigned a bare `long` tier by walltime.
+
+The bins are one minute past the round hour figure (1441, 4321) rather than exactly on it, so a
+24-hour request stays in `short` with a minute of slack.
+
+### `gpu-test` partition redirect
+
+A job that lands in `gpu-test` also has its **partition rewritten to `gputest`** — unless it is on
+`mig`, `grace`, `rtx6000`, `ailab`, `ailab-p`, or `hackathon`, which keep the partition they asked
+for. This is how short GPU test jobs reach the test hardware without the user naming it, and it is
+why users must **not** pass `-p gputest` themselves (that is rejected outright — see *Disallowed
+partitions at submit time* above). The correct user-facing instruction is "request ≤ 1 hour", not
+"submit to gputest".
 
 ---
 
