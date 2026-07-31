@@ -90,27 +90,13 @@ There are two routes, and which one a job takes depends only on its partition:
 
 ### The `gpu-*` split
 
-`getQOS()` bins on `--time` in minutes, using the Lua constants `TEST_MINS`, `SHORT_MINS`,
-`MEDIUM_MINS`, `VLONG_MINS`. GPU jobs then map `vlong → long` and prefix `gpu-`:
+`getQOS()` bins on `--time` in minutes, and GPU jobs then map `vlong → long` and prefix `gpu-`. The
+bin table, the off-by-a-minute cutoffs, and the `gputest` partition redirect are in
+[submit-restrictions.md](submit-restrictions.md#walltime-bins-general-gpu-flow).
 
-| `--time` | minutes | Base tier | GPU job becomes |
-|----------|---------|-----------|-----------------|
-| ≤ 1 h | ≤ 60 | `test` | `gpu-test` |
-| ≤ 24 h | ≤ 1441 | `short` | `gpu-short` |
-| ≤ 72 h | ≤ 4321 | `medium` | `gpu-medium` |
-| ≤ 6 days | ≤ 8641 | `vlong` | `gpu-long` |
-| > 6 days | > 8641 | — | **rejected** (`ESLURM_INVALID_TIME_LIMIT`) |
-
-Notes that catch people out:
-
-- There is **no `gpu-vlong`**. The `vlong → long` remap happens only for GPU jobs, so a CPU job
-  keeps the bare tier name (`test`, `short`, `medium`, `vlong`) while a GPU job of the same walltime
-  becomes `gpu-long`.
-- The cutoffs are one minute past the round number (1441, 4321), so `--time=24:00:00` and
-  `--time=24:01:00` both land in `short`. The tier changes at 24 h + 2 min.
-- A `gpu-test` job is also **moved into the `gputest` partition** — except on `mig`, `grace`,
-  `rtx6000`, `ailab`, `ailab-p`, and `hackathon`, which keep their partition. See
-  [submit-restrictions.md](submit-restrictions.md).
+What matters for priority: **`--time` picks the tier, and the tier carries both the QOS priority and
+the per-user GPU ceiling.** A user asking for more walltime than they need is silently trading away
+priority and GPU headroom. Recorded priorities per tier: [values.md](values.md).
 
 ### Reading the routing live
 
@@ -126,4 +112,5 @@ ceiling of every tier side by side, which is usually enough to explain both the 
 `QOSMaxGRESPerUser` hold.
 
 Priority affects **queue order, not packing**. A large multi-node GPU job can still wait on
-fragmentation even with high QOS points.
+fragmentation even with high QOS points — the order-vs-availability split and the reason-code
+routing table live in [troubleshooting.md](troubleshooting.md#why-is-my-job-not-running).

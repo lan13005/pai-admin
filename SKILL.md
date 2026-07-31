@@ -30,12 +30,15 @@ qos                                    # QOS priorities and limits
    from walltime at submit time, so it is usually **not** the partition default.
 2. `qos` — compare that QOS against the other tiers' priorities and per-user GPU ceilings. This one
    command explains most `Priority` and `QOSMaxGRESPerUser` holds.
-3. Match the reason: `Priority` / `Resources` / `QOSMaxGRESPerUser` / `Dependency` — see
-   [references/troubleshooting.md](references/troubleshooting.md). For `Priority`, break the score
-   down with `sprio -j <jobid>` and `sshare -u <user>`; the formula, the walltime → `gpu-*` bins,
-   and the `pli-*` early return are in [references/priority.md](references/priority.md).
-4. Remember priority sets **queue order, not packing** — a wide multi-node GPU job can still
-   wait on fragmentation. Check `gfree` and `shownodes -p <partition>`.
+3. Route on the reason with the table in
+   [references/troubleshooting.md](references/troubleshooting.md#why-is-my-job-not-running). Every
+   hold is either **order** (priority) or **availability** (fit, limits, node health), and the fix
+   for one does nothing for the other.
+4. For `Priority`, break the score down with `sprio -j <jobid>` and `sshare -u <user>`; the formula
+   and the `pli-*` vs `gpu-*` routing are in [references/priority.md](references/priority.md), the
+   walltime bins themselves in [references/submit-restrictions.md](references/submit-restrictions.md).
+   Priority sets queue order, not packing — check `gfree` and `shownodes -p <partition>` before
+   blaming the score.
 
 ### Check or grant a user's access
 
@@ -66,24 +69,11 @@ guidance, storage, and support contacts: [references/pli-partition.md](reference
 |------|----------|
 | [references/accounts.md](references/accounts.md) | `ailab` / `ailab-p` account tree, faculty sponsor via `finger`, the two access gates, partition account rules, `GrpTRESMins` allocations |
 | [references/priority.md](references/priority.md) | Multifactor priority formula, where each factor comes from, submit-time QOS routing (`gpu-*` vs `pli-*`) |
-| [references/submit-restrictions.md](references/submit-restrictions.md) | Submit-time rules from `job_submit.lua`, RPC → plugin chain, inspecting compiled `.so` plugins |
+| [references/submit-restrictions.md](references/submit-restrictions.md) | Submit-time rules from `job_submit.lua`, the walltime → `gpu-*` bins, RPC → plugin chain, inspecting compiled `.so` plugins |
+| [references/slurm-config.md](references/slurm-config.md) | `/etc/slurm/` file map and how to read the effective config |
 | [references/pli-partition.md](references/pli-partition.md) | User-facing PLI model: audience, intent, best practices, storage, support |
 | [references/values.md](references/values.md) | Recorded inventory and QOS snapshots for quick citation |
-| [references/troubleshooting.md](references/troubleshooting.md) | Common pending reasons, node drain/down, who-is-using-what |
-
-## Slurm configuration paths
-
-Operator-facing files live under **`/etc/slurm/`**: `slurm.conf` (partitions, nodes,
-`AccountingStorage*`, `JobSubmitPlugins`, priority weights), `slurmdbd.conf` (accounting DB
-bridge, usually on the DB host), `gres.conf` (GPU definitions), `cgroup.conf`, `topology.conf`,
-`plugstack.conf` (SPANK stack), and `job_submit.lua` (Lua submit filter).
-
-Read the effective config rather than the files when possible:
-
-```bash
-scontrol show config | head -30
-scontrol show config | rg -i 'PriorityWeight|PriorityType|PriorityFlags|PriorityMax'
-```
+| [references/troubleshooting.md](references/troubleshooting.md) | Order vs availability model, `Reason` → where-to-look routing table, node drain/down, who-is-using-what |
 
 ## Useful commands
 

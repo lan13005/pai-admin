@@ -1,6 +1,6 @@
 # PLI partition reference (user-facing model)
 
-Condensed from the PLI Della guide ([Notion](https://zinc-scale-b3f.notion.site/The-Della-cluster-and-the-PLI-partition-a3526cf557334124903964a3fa529f68)) by Yihe Dong. Use this when answering **who uses which PLI partition**, **shared-GPU misconceptions**, **storage**, or **user best practices**.
+Condensed from the PLI Della guide by Yihe Dong. Use this when answering **who uses which PLI partition**, **shared-GPU misconceptions**, **storage**, or **user best practices**.
 
 **Do not treat QOS numbers here as live truth.** Re-verify with `sacctmgr show qos`, `scontrol show partition`, and `job_submit.lua`. Hard submit rules: [submit-restrictions.md](submit-restrictions.md). Recorded ops tables: [values.md](values.md).
 
@@ -31,10 +31,9 @@ In most cases users submit to **`pli`**, **`pli-lc`**, or **`pli-c`** (partition
 
 Users may still use non-PLI Della GPUs. For quick tests, prefer Della **`gputest`** / short general-GPU jobs (&lt; 1 h). PLI has **no test partition**; wait times are expected. PLI is primarily for `sbatch`, not interactive testing.
 
-> Users must **not** pass `-p gputest` — the Lua filter rejects it. Instead, a GPU job with
-> `--time` ≤ 1 h is assigned `gpu-test` and moved into the `gputest` partition automatically. Tell
-> users to request an hour, not to name the partition. See
-> [submit-restrictions.md](submit-restrictions.md).
+> Tell users to **request ≤ 1 hour, not to name the partition** — `-p gputest` is rejected outright,
+> while a short GPU job is routed there automatically. Mechanism and the partitions exempt from the
+> redirect: [submit-restrictions.md](submit-restrictions.md).
 
 **Age priority:** only the **10 oldest actively waiting jobs per user** accrue age-based priority.
 
@@ -65,6 +64,8 @@ Snapshot of the user guide’s intent table. **Priorities and Max\*GPU limits dr
 ### Partitions ≠ fixed GPU pools
 
 A partition is better thought of as a **queue with rules**, not a dedicated set of GPUs. Physical PLI GPUs are shared across PLI partitions. An empty `pli` queue can still wait if other PLI partitions hold the nodes. Limits (e.g. Max Grp GPU) constrain how much of the shared pool a QOS/partition family can occupy.
+
+This is the availability gate, not a priority problem — see [troubleshooting.md](troubleshooting.md#why-is-my-job-not-running).
 
 ---
 

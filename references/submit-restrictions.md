@@ -67,7 +67,10 @@ Jobs requesting “unlimited” memory are rejected:
 - `--mem=0` (mapped to `pn_min_memory == 0`)
 - `--mem-per-cpu=0` (`min_mem_per_cpu == 0`)
 
-### GPU job QoS naming convention (general GPU flow)
+### Walltime bins (general GPU flow)
+
+**This table is the single source of truth for the bins.** [priority.md](priority.md) and
+[values.md](values.md) link here rather than repeating it — update this section only.
 
 For jobs detected as GPU jobs (`is_GPU_job()`), the plugin builds the QoS name in three steps:
 
@@ -89,6 +92,15 @@ Anything above `VLONG_MINS` is rejected earlier with `ESLURM_INVALID_TIME_LIMIT`
 
 The bins are one minute past the round hour figure (1441, 4321) rather than exactly on it, so a
 24-hour request stays in `short` with a minute of slack.
+
+There is **no `gpu-vlong`**: the `vlong → long` remap applies to GPU jobs only, so a CPU job keeps
+the bare tier name (`test`, `short`, `medium`, `vlong`) while a GPU job of the same walltime becomes
+`gpu-long`. Because the tier decides both the QoS priority and the per-user GPU ceiling, `--time` is
+the main knob a user has over both — see [priority.md](priority.md) and [values.md](values.md).
+
+The `VLONG_MINS` cap is enforced by the plugin and is **stricter than some partition `MaxTime`
+values** (`ailab` advertises 15 days). The submit filter wins: the job is rejected before it is ever
+queued.
 
 ### `gpu-test` partition redirect
 

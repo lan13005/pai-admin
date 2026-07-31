@@ -18,24 +18,19 @@ Snapshots of inventory and QOS config for quick citation. **Re-verify before act
 
 | Partition | Nodes | GPUs | Notes |
 |-----------|-------|------|-------|
-| `ailab` | 18 (`della-i19g[1-3]` … `della-i24g[1-3]`) | 144 × H200 (8/node) | ~1.5 TB/node, 64 CPU/node, MaxTime 15 days; billing CPU=1.0, Mem=0.1G, GPU=12 |
+| `ailab` | 18 (`della-i19g[1-3]` … `della-i24g[1-3]`) | 144 × H200 (8/node) | ~1.5 TB/node, 64 CPU/node; billing CPU=1.0, Mem=0.1G, GPU=12 |
 | `ailab-p` | same node family as `ailab` | same H200 pool | project-account partition; confirm live |
 | `pli` | — | 336 × H100 | QOS tiers below |
 
+`job_submit.lua` rejects any job over `VLONG_MINS` (≈ 6 days) before it reaches the partition, and PLI partitions are capped at 3 days.
+Quote the submit filter, not `MaxTime`, when telling a user how long they can ask for —
+[submit-restrictions.md](submit-restrictions.md).
+
 ## Walltime → `gpu-*` (ailab / general GPU flow)
 
-From `getQOS()` and the rewrite in `job_submit.lua`. Mechanism and edge cases:
-[priority.md](priority.md).
-
-| `--time` | Cutoff (min) | Base | Rewritten QOS |
-|----------|--------------|------|---------------|
-| ≤ 1 h | `TEST_MINS` = 60 | `test` | `gpu-test` |
-| ≤ 24 h | `SHORT_MINS` = 1441 | `short` | `gpu-short` |
-| ≤ 72 h | `MEDIUM_MINS` = 4321 | `medium` | `gpu-medium` |
-| ≤ 6 days | `VLONG_MINS` = 8641 | `vlong` → `long` | `gpu-long` |
-| > 6 days | — | — | rejected |
-
-No `gpu-vlong` exists; CPU jobs keep the bare tier name.
+The bins are Lua constants, the authoritative copy is in
+[submit-restrictions.md](submit-restrictions.md#walltime-bins-general-gpu-flow). Why the tier matters for
+queue order: [priority.md](priority.md).
 
 ## QOS: `gpu-*`
 

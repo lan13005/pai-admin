@@ -69,7 +69,9 @@ AccountingStorageEnforce=associations,limits,qos
 ```
 
 `safe` is typically **not** enabled, so a job may start even when the remaining allocation cannot
-cover its full request — it can then be killed when the account hits the limit.
+cover its full request — it can then be killed when the account hits the limit. Once the cap is
+reached, later jobs pend with `AssocGrpGRESMins` / `AssocGrpBillingMinutes`
+([troubleshooting.md](troubleshooting.md#why-is-my-job-not-running)).
 
 - Cap GPU-hours with **`GrpTRESMins`** on the project account. Units are TRES-minutes: 10 000
   GPU-hours → `gres/gpu=600000`.
@@ -96,7 +98,8 @@ sacctmgr modify account <project> set GrpSubmitJobs=0    # block submits
 - H200 shared pool; group adds are sysadmin-owned (see the two gates above).
 - Associations are allowed on `ailab` itself, not on `ailab-p` children (`DenyAccounts=ailab-p`).
 - Effective priority QOS is usually `gpu-*` after the submit rewrite — see [priority.md](priority.md).
-- Submit policy: requires GPUs, ≤ 8 CPUs per GPU per node, rejects the `pli` account.
+- Submit policy in brief — requires GPUs, ≤ 8 CPUs per GPU per node, rejects the `pli` account.
+  Authoritative list: [submit-restrictions.md](submit-restrictions.md).
 
 ### ailab-p
 
@@ -108,6 +111,7 @@ sacctmgr modify account <project> set GrpSubmitJobs=0    # block submits
 ### pli
 
 - H100 pool with partition-specific `pli-*` QOS (early return in the Lua filter).
-- Submit policy: requires GPUs, time ≤ 3 days, anti-fragmentation on multinode, node excludes for
-  single-GPU jobs, no mixing with `ailab*`.
+- Submit policy in brief — requires GPUs, time ≤ 3 days, anti-fragmentation on multinode, node
+  excludes for single-GPU jobs, no mixing with `ailab*`. Authoritative list:
+  [submit-restrictions.md](submit-restrictions.md).
 - Audience and user-facing model: [pli-partition.md](pli-partition.md).
