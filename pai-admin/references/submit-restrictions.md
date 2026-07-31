@@ -1,6 +1,6 @@
-# Slurm submission restrictions (Della / PLI / AiLab)
+# Slurm submission restrictions (Della / PLI / ailab)
 
-This document summarizes **submission-time** restrictions enforced on the Della Slurm cluster, with emphasis on **PLI** and **AiLab** GPU partitions.
+This document summarizes **submission-time** restrictions enforced on the Della Slurm cluster, with emphasis on **PLI** and **ailab** GPU partitions.
 
 Recorded QOS and walltime tables: [values.md](values.md). Priority routing: [priority.md](priority.md).
 
@@ -18,29 +18,6 @@ Example expected output includes:
 - `JobSubmitPlugins = list_accounts,lua`
 - `PluginDir = /usr/lib64/slurm`
 
-## How the pieces connect (RPC → plugins → files)
-
-1. **`sbatch`** sends a **submit RPC** to **`slurmctld`**. Submit-time policy runs **on the controller**, not inside the `sbatch` binary.
-
-2. **`slurmctld`** walks **`JobSubmitPlugins`** **left to right** (order in `slurm.conf`). Each name `N` loads **`$PluginDir/job_submit_N.so`** and runs its job-submit hook. Example: `list_accounts` → **`/usr/lib64/slurm/job_submit_list_accounts.so`**.
-
-3. **Lua** is another entry in the same list: if `lua` is present, **`/etc/slurm/job_submit.lua`** is driven by **`job_submit_lua.so`**, and Slurm calls **`slurm_job_submit(job_desc, part_list, submit_uid)`** in that file. That runs **in plugin order relative to `list_accounts`** (e.g. with `list_accounts,lua`, list-accounts runs first).
-
-4. **Why `strings(1)` on a `.so` matches user errors:** C plugins embed message templates in the shared object. The plugin prints them when it rejects or warns; the text is not stored in a separate message catalog at runtime.
-
-5. **Stock errors** (e.g. “Invalid account or account/partition combination specified”) usually come from **Slurm’s association / accounting checks**, not from `job_submit.lua`. A single failed submit can return **both** a **plugin-specific** line and a **core Slurm** line.
-
-All of this happens **before** the job is scheduled or allocated; failures return over the same RPC `sbatch` already opened.
-
-## Inspecting compiled plugins (`.so`)
-
-```bash
-strings /usr/lib64/slurm/job_submit_list_accounts.so | rg -i 'account|ERROR'
-rg -a 'You have to specify an account' /usr/lib64/slurm/*.so
-```
-
-`rg` may report `binary file matches` without printing lines; use `strings` piped to `rg`, or narrow to one `.so`.
-
 ## Summary table (high-signal)
 
 | Scope | What it checks | What happens | Notes / user-visible behavior |
@@ -56,9 +33,9 @@ rg -a 'You have to specify an account' /usr/lib64/slurm/*.so
 | **PLI** | Multinode GPU job not “dense enough” | **Reject** | Anti-fragmentation: forbids e.g. 2 nodes × 4 GPUs |
 | **PLI** | `pli-cp` QoS time > 8 hours | **Reject** | Special “core priority” debugging QoS |
 | **PLI** | Single-GPU jobs | **Mutate** | Adds an exclude list to reserve some nodes for multi-GPU jobs |
-| **AiLab** | Not requesting GPUs | **Reject** | AiLab nodes require GPU allocation |
-| **AiLab** | CPU over-allocation per GPU | **Reject** | Enforces ≤ 8 CPU cores per GPU (per node) |
-| **AiLab** | Using account `pli` | **Reject** | Must use PI account, not PLI |
+| **ailab** | Not requesting GPUs | **Reject** | ailab nodes require GPU allocation |
+| **ailab** | CPU over-allocation per GPU | **Reject** | Enforces ≤ 8 CPU cores per GPU (per node) |
+| **ailab** | Using account `pli` | **Reject** | Must use PI account, not PLI |
 
 ---
 
@@ -170,22 +147,22 @@ This is a **submission-time rejection** (not a scheduler preference).
 
 ### PLI single-GPU placement (node exclusions)
 
-If a PLI job requests exactly **1 GPU**, the plugin mutates the request by adding an **exclude list** (via `PLI_exclude(job_desc)`) to keep certain nodes reserved for multi-GPU jobs.
+If a PLI job requests exactly **1 GPU**, the plugin mutates the request by adding an **exclude list** (via `PLI_exclude(job_desc)`) to keep certain nodes reserved for multi-GPU jobs. Currently, 40 percent of the nodes are reserved for multi-GPU jobs.
 
 ---
 
-## AiLab restrictions (`ailab`)
+## ailab restrictions (`ailab`)
 
-AiLab logic is enforced in `ailab_check(job_desc)`, invoked when `job_desc.partition` matches `ailab`.
+ailab logic is enforced in `ailab_check(job_desc)`, invoked when `job_desc.partition` matches `ailab`.
 
-### AiLab requires GPUs
+### ailab requires GPUs
 
-If the job targets AiLab nodes but does not request GPUs, it is rejected:
+If the job targets ailab nodes but does not request GPUs, it is rejected:
 - “requesting the AI Lab nodes but not allocating GPUs”
 
 ### CPU per GPU cap (per node)
 
-AiLab enforces **≤ 8 CPU cores per GPU per node**.
+ailab enforces **≤ 8 CPU cores per GPU per node**.
 
 Implementation details:
 - `CORES = get_node_CPUs(job_desc)` (derived from tasks × cpus-per-task; intended to be per-node)
@@ -194,6 +171,30 @@ Implementation details:
 
 ### Account restriction
 
-AiLab rejects jobs using the `pli` account:
+ailab rejects jobs using the `pli` account:
 - “requesting the AI Lab nodes but using the PLI account … use your PI account”
 
+# Additional Information
+
+## How the pieces connect (RPC → plugins → files)
+
+1. **`sbatch`** sends a **submit RPC** to **`slurmctld`**. Submit-time policy runs **on the controller**, not inside the `sbatch` binary.
+
+2. **`slurmctld`** walks **`JobSubmitPlugins`** **left to right** (order in `slurm.conf`). Each name `N` loads **`$PluginDir/job_submit_N.so`** and runs its job-submit hook. Example: `list_accounts` → **`/usr/lib64/slurm/job_submit_list_accounts.so`**.
+
+3. **Lua** is another entry in the same list: if `lua` is present, **`/etc/slurm/job_submit.lua`** is driven by **`job_submit_lua.so`**, and Slurm calls **`slurm_job_submit(job_desc, part_list, submit_uid)`** in that file. That runs **in plugin order relative to `list_accounts`** (e.g. with `list_accounts,lua`, list-accounts runs first).
+
+4. **Why `strings(1)` on a `.so` matches user errors:** C plugins embed message templates in the shared object. The plugin prints them when it rejects or warns; the text is not stored in a separate message catalog at runtime.
+
+5. **Stock errors** (e.g. “Invalid account or account/partition combination specified”) usually come from **Slurm’s association / accounting checks**, not from `job_submit.lua`. A single failed submit can return **both** a **plugin-specific** line and a **core Slurm** line.
+
+All of this happens **before** the job is scheduled or allocated; failures return over the same RPC `sbatch` already opened.
+
+## Inspecting compiled plugins (`.so`)
+
+```bash
+strings /usr/lib64/slurm/job_submit_list_accounts.so | rg -i 'account|ERROR'
+rg -a 'You have to specify an account' /usr/lib64/slurm/*.so
+```
+
+`rg` may report `binary file matches` without printing lines; use `strings` piped to `rg`, or narrow to one `.so`.
