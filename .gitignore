@@ -1,2 +1,4 @@
 artifacts
 side-quests
+.ruff_cache
+.cursor

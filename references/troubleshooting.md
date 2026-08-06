@@ -35,6 +35,14 @@ scontrol show job <jobid>              # Reason, Partition, QOS, Account, ReqTRE
 Reason strings vary by Slurm version and are truncated in default `squeue` output — take them from
 `scontrol show job`, not from a screenshot.
 
+Whether you can target a better QOS depends on partition family:
+
+- **`ailab` / `ailab-p`**: walltime selects the `gpu-*` tier. Shortest honest `--time` plus a smaller
+  shape (fewer GPUs / nodes) raises QOS priority and packs / backfills more easily.
+- **`pli*`**: the partition (not walltime) picks the QOS, except walltime bins inside `pli-c`. A
+  different tier means a different partition or a QOS grant on the account
+  ([priority.md](priority.md), [accounts.md](accounts.md)).
+
 ## "Priority"
 
 Queued behind higher-priority work. Break the score down with `sprio -j <jobid>` and
