@@ -28,6 +28,7 @@ scontrol show job <jobid>              # Reason, Partition, QOS, Account, ReqTRE
 | `Resources` | availability | `gfree`, `shownodes -p <partition>` |
 | `QOSMaxGRESPerUser`, `QOSGrpGPULimit`, `QOSMaxNodePerUser` | availability (limit) | `qos`, [values.md](values.md) |
 | `AssocGrpGRESMins`, `AssocGrpBillingMinutes` | availability (allocation) | `GrpTRESMins` on the account — [accounts.md](accounts.md) |
+| `InvalidQOS`, `InvalidAccount` (rejected, not pending) | access | the account's QOS list — [accounts.md](accounts.md) |
 | `ReqNodeNotAvail`, `Nodes required for job are DOWN/DRAINED` | availability (health) | node drain section below |
 | `Dependency`, `JobHeldUser`, `JobHeldAdmin`, `BeginTime` | neither | the job's own state; nothing to do with the cluster |
 
@@ -38,7 +39,7 @@ Reason strings vary by Slurm version and are truncated in default `squeue` outpu
 
 Queued behind higher-priority work. Break the score down with `sprio -j <jobid>` and
 `sshare -u <user>` — see [priority.md](priority.md). Fairshare often matters more than QOS, and the
-QOS is assigned from walltime at submit time, so read it off the job rather than the partition.
+submit filter assigns the QOS, so read it off the job rather than the partition.
 
 `Priority` and `Resources` alternate as the cluster fills, so a `Priority` reason does **not** mean
 priority is the whole story. Check availability too before promising that a QOS or fairshare change
@@ -66,10 +67,26 @@ them in).
 
 ## "QOSMaxGRESPerUser"
 
-The user hit the GPU ceiling for their QOS. Compare `squeue -u <user>` against live QOS limits
-(`sacctmgr show qos`, or [values.md](values.md) for the recorded snapshot). The QOS came from the
-job's walltime, so a shorter `--time` lands the job in a tier with a different ceiling — see the
-`gpu-*` bins in [priority.md](priority.md).
+The user hit a per-user GPU ceiling. Find which QOS actually sets it before advising anything — where
+a partition has its own QOS, that one overrides the job's QOS limits
+([priority.md](priority.md#how-the-two-qos-interact)):
+
+```bash
+scontrol show job <jobid> | rg -o 'QOS=\S+'                 # job QOS
+scontrol show partition <p> | tr ' ' '\n' | grep '^QoS='    # partition QOS, if any
+squeue -u <user> -t R -h -O "tres-alloc:100"                # what they already hold
+```
+
+Whether a shorter `--time` raises the ceiling:
+
+- **`ailab` / `ailab-p`**: no. The partition QOS pins the ceiling at 16 (`ailab`) or 24 (`ailab-p`)
+  for every `gpu-*` tier. A shorter `--time` buys queue position, not headroom.
+- **general GPU partitions**: yes. With no partition QOS, the `gpu-*` tier's own ceiling applies
+  (`gpu-short` 44, `gpu-medium` 20, `gpu-long` 16).
+- **`pli*`**: no. The partition fixes the QOS, so the user needs a different partition or a QOS grant
+  on their account ([accounts.md](accounts.md)).
+
+Recorded ceilings: [values.md](values.md).
 
 ## Rejected at submit: "You have to specify an account" / "Invalid account or account/partition combination"
 
@@ -77,6 +94,10 @@ Not a pending reason — the controller refused the job. The allowed-account mes
 **`job_submit_list_accounts.so`** (`list_accounts` in `JobSubmitPlugins`), not from
 `job_submit.lua`. A second line is usually Slurm's stock association error. Confirm associations,
 then see [submit-restrictions.md](submit-restrictions.md).
+
+An invalid-QOS rejection on `pli` / `pli-lc` usually means the account was never granted the QOS the
+filter forces for that partition — that is the access gate there, not a typo
+([accounts.md](accounts.md)).
 
 ```bash
 sacctmgr show assoc where User=<user> format=Cluster,Account,User,Partition,QOS%200

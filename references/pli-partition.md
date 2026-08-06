@@ -11,6 +11,7 @@ Condensed from the PLI Della guide by Yihe Dong. Use this when answering **who u
 | Question type | Look here |
 |---------------|-----------|
 | Which PLI partition for proposal vs core vs priority users? | Partition family |
+| How PLI access / QOS grants are administered | [accounts.md](accounts.md) |
 | Why is my PLI queue empty but jobs still wait? | Partitions ≠ fixed GPU pools |
 | CPU/mem per GPU, interactive limits, `-N 1` | Best practices |
 | Single-GPU / array jobs on PLI | Single-GPU jobs |
@@ -29,15 +30,18 @@ In most cases users submit to **`pli`**, **`pli-lc`**, or **`pli-c`** (partition
 | PLI members focused on large language models | `pli-c` |
 | Rare, selected high-priority projects | `pli-p` |
 
-Users may still use non-PLI Della GPUs. For quick tests, prefer Della **`gputest`** / short general-GPU jobs (&lt; 1 h). PLI has **no test partition**; wait times are expected. PLI is primarily for `sbatch`, not interactive testing.
+Users may still use non-PLI Della GPUs. For quick tests, prefer Della **`gputest`** / short general-GPU jobs (≤ 1 h). PLI has **no test partition**; wait times are expected. PLI is primarily for `sbatch`, not interactive testing.
 
-> Tell users to **request ≤ 1 hour, not to name the partition** — `-p gputest` is rejected outright,
-> while a short GPU job is routed there automatically. Mechanism and the partitions exempt from the
-> redirect: [submit-restrictions.md](submit-restrictions.md).
+> This is **non-PLI Della GPU routing**: tell users to **request ≤ 1 hour, not to name the
+> partition** — `-p gputest` is rejected outright, while a short GPU job is routed there
+> automatically. PLI has no test partition and no such redirect. Mechanism and the partitions exempt
+> from the redirect: [submit-restrictions.md](submit-restrictions.md).
 
 **Age priority:** only the **10 oldest actively waiting jobs per user** accrue age-based priority.
 
-Submit with partition (`-p` / `-P`) and account (`-A`). QOS is usually chosen automatically from affiliation and walltime (see Lua / cluster setup below).
+Submit with partition (`-p` / `-P`) and account (`-A`). The submit filter chooses the QOS from the
+**partition** (walltime only bins within `pli-c`), and the user's account must have been granted that
+QOS — routing in [priority.md](priority.md), grants in [accounts.md](accounts.md).
 
 ---
 
@@ -56,7 +60,7 @@ Snapshot of the user guide’s intent table. **Priorities and Max\*GPU limits dr
 
 ### Column meanings (user-guide framing)
 
-- **QOS:** Quality of service; usually set from affiliation + job duration (submit plugin).
+- **QOS:** Quality of service; selected by partition, with walltime selecting the tier within `pli-c`.
 - **Prio:** Higher base QOS priority → earlier in multifactor QOS term (fairshare/age still matter).
 - **Max Grp GPU:** Cap on GPUs in use under that QOS **cluster-wide**, not “GPUs owned by the partition.”
 - **`pli-p`:** Reserved for outstanding, proven recipes; short windows; not for deadline crunching by default.

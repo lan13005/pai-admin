@@ -31,7 +31,7 @@ Example expected output includes:
 | **PLI** | No GPUs requested (any GPU-less job on PLI) | **Reject** | “requesting PLI nodes but not allocating GPUs” |
 | **PLI** | `--time` > 3 days for PLI partitions | **Reject** | PLI time policy is stricter than default |
 | **PLI** | Multinode GPU job not “dense enough” | **Reject** | Anti-fragmentation: forbids e.g. 2 nodes × 4 GPUs |
-| **PLI** | `pli-cp` QoS time > 8 hours | **Reject** | Special “core priority” debugging QoS |
+| **PLI** | `pli-cp` QOS time > 8 hours | **Reject** | Special “core priority” debugging QOS |
 | **PLI** | Single-GPU jobs | **Mutate** | Adds an exclude list to reserve some nodes for multi-GPU jobs |
 | **ailab** | Not requesting GPUs | **Reject** | ailab nodes require GPU allocation |
 | **ailab** | CPU over-allocation per GPU | **Reject** | Enforces ≤ 8 CPU cores per GPU (per node) |
@@ -59,7 +59,7 @@ The plugin rejects submissions that directly specify:
 - `-p gputest`
 - `-p gpu`
 
-This is separate from the later logic that routes GPU jobs into an appropriate GPU QoS/partition flow.
+This is separate from the later logic that routes GPU jobs into an appropriate GPU QOS/partition flow.
 
 ### Memory request sanity checks
 
@@ -72,7 +72,7 @@ Jobs requesting “unlimited” memory are rejected:
 **This table is the single source of truth for the bins.** [priority.md](priority.md) and
 [values.md](values.md) link here rather than repeating it — update this section only.
 
-For jobs detected as GPU jobs (`is_GPU_job()`), the plugin builds the QoS name in three steps:
+For jobs detected as GPU jobs (`is_GPU_job()`), the plugin builds the QOS name in three steps:
 
 1. `getQOS(job_desc.time_limit)` returns a base tier from walltime.
 2. `vlong` is remapped to `long` — GPU jobs only, so there is no `gpu-vlong`.
@@ -80,7 +80,7 @@ For jobs detected as GPU jobs (`is_GPU_job()`), the plugin builds the QoS name i
 
 Time bins, from the constants at the top of the Lua file:
 
-| Constant | Value (min) | `--time` | Base tier | GPU QoS |
+| Constant | Value (min) | `--time` | Base tier | GPU QOS |
 |----------|-------------|----------|-----------|---------|
 | `TEST_MINS` | 60 | ≤ 1 h | `test` | `gpu-test` |
 | `SHORT_MINS` | 1441 | ≤ 24 h | `short` | `gpu-short` |
@@ -95,8 +95,8 @@ The bins are one minute past the round hour figure (1441, 4321) rather than exac
 
 There is **no `gpu-vlong`**: the `vlong → long` remap applies to GPU jobs only, so a CPU job keeps
 the bare tier name (`test`, `short`, `medium`, `vlong`) while a GPU job of the same walltime becomes
-`gpu-long`. Because the tier decides both the QoS priority and the per-user GPU ceiling, `--time` is
-the main knob a user has over both — see [priority.md](priority.md) and [values.md](values.md).
+`gpu-long`. The tier determines QOS priority. It also determines the per-user GPU ceiling when no
+partition QOS overrides that limit — see [priority.md](priority.md) and [values.md](values.md).
 
 The `VLONG_MINS` cap is enforced by the plugin and is **stricter than some partition `MaxTime`
 values** (`ailab` advertises 15 days). The submit filter wins: the job is rejected before it is ever
@@ -122,17 +122,22 @@ PLI logic is handled in the `if string.match(job_desc.partition, "pli") then ...
 If the partition string matches both `pli` and `ailab`, the job is rejected:
 - “You cannot specify both pli and ailab partitions!”
 
-### PLI time limits + QoS selection
+### PLI time limits + QOS selection
 
 - **PLI partitions require `--time` ≤ 3 days** (else rejected).
-- The plugin sets PLI QoS depending on the specific partition:
-  - **`pli-c`**: derives `pli-short|pli-medium` etc via `set_plic_qos()`, and also adjusts account to `pli` if not `cses`
+- The QOS is chosen by **partition**, not by walltime (except inside `pli-c`):
+  - **`pli-c`**: `set_plic_qos()` bins walltime into `pli-short` / `pli-medium` (a `test`-length job is
+    promoted to `short`, so there is no `pli-test`), and adjusts the account to `pli` unless it is
+    already `cses`
   - **`pli-p`**: forces `job_desc.qos = "pli-high"`
-  - **`pli`**: sets `job_desc.qos = "pli-low"` (subject to time policy)
+  - **`pli`**: sets `job_desc.qos = "pli-low"` after rejecting anything over 3 days
   - **`pli-lc`**: sets `job_desc.qos = "pli-lc"`
+- Because the QOS is fixed by partition, the user's account must be **granted** that QOS or the job is
+  rejected by the association check — this is the real access gate on `pli` / `pli-lc`
+  ([accounts.md](accounts.md)).
 
 Special case:
-- **`pli-cp` QoS**: enforces `--time` ≤ 8 hours (480 minutes), else rejected.
+- **`pli-cp` QOS**: enforces `--time` ≤ 8 hours (480 minutes), else rejected.
 
 ### PLI requires GPUs
 
@@ -163,9 +168,10 @@ If a PLI job requests exactly **1 GPU**, the plugin mutates the request by addin
 
 ---
 
-## ailab restrictions (`ailab`)
+## ailab restrictions (`ailab`, `ailab-p`)
 
-ailab logic is enforced in `ailab_check(job_desc)`, invoked when `job_desc.partition` matches `ailab`.
+ailab logic is enforced in `ailab_check(job_desc)`, invoked when `job_desc.partition` **matches** the
+substring `ailab` — so it covers `ailab-p` as well as `ailab`.
 
 ### ailab requires GPUs
 
