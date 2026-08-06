@@ -14,11 +14,11 @@ with the commands below whenever policy may have changed.
 ## Quick start
 
 ```bash
-gfree                                  # free GPUs by type/partition
-shownodes -p ailab                     # node states
+gfree                                  # free GPUs by type/partition/cores/mem/Slurm directives
+shownodes -p ailab                     # node states, free cpus/gpus, memory, Slurm Features (os, nvme, intel, gpu group)
 squeue -p ailab                        # queue + pending reasons
 scontrol show partition ailab          # AllowGroups, MaxTime, TRESBillingWeights
-slurmtree -a ailab -q -u               # account tree with QOS (-q) and users (-u)
+slurmtree -a ailab -q -u               # account tree with QOS (-q) and users (-u) - Slurm Coordinator
 qos                                    # QOS priorities and limits
 ```
 
@@ -39,6 +39,13 @@ qos                                    # QOS priorities and limits
    walltime bins themselves in [references/submit-restrictions.md](references/submit-restrictions.md).
    Priority sets queue order, not packing — check `gfree` and `shownodes -p <partition>` before
    blaming the score.
+
+### Check utilization of a running job
+
+1. `jobstats` is part of the Job Defense Shield system, see [Reference Material](#reference-material) below.
+2. Running `jobstats <jobid>` will show you important information about the job including:
+   - user, job state, cpu/gpu/mem request, qos/partition, timing, and more.
+3. More importantly, it shows (cpu/gpu/mem) utilization averages and flags poor utilization!
 
 ### Check or grant a user's access
 
@@ -75,10 +82,20 @@ guidance, storage, and support contacts: [references/pli-partition.md](reference
 | [references/values.md](references/values.md) | Recorded inventory and QOS snapshots for quick citation |
 | [references/troubleshooting.md](references/troubleshooting.md) | Order vs availability model, `Reason` → where-to-look routing table, node drain/down, who-is-using-what |
 
+Additional references:
+
+- Princeton RC uses [Job Defense Shield](https://princetonuniversity.github.io/job_defense_shield/) to identify and
+reduce instances of underutilization of the cluster. This is the system that sends automated email alerts, automatically
+cancels GPU jobs at 0% utilization, and create reports.
+- [Removing Tedium](https://github.com/PrincetonUniversity/removing_tedium) is collection of docs that can help improve your
+productivity. Are you tired of Duo? Do you waste time entering your password every time you log in or do a file transfer? 
+Do you want to automate repetitive tasks? Click that button.
+
 ## Useful commands
 
 ```bash
-finger <user>                          # Office = dept, faculty sponsor
+finger <user>                          # Office = dept, faculty sponsor, map netid to office
+gpudash                                # Show GPU utilization across all nodes in the cluster, which nodes busy
 scontrol show job <jobid>
 scontrol show node <nodename>
 sacct -j <jobid> --format=JobID,JobName,Partition,State,Elapsed,MaxRSS,MaxVMSize,AllocTRES%40
